@@ -19,12 +19,14 @@ def webscraping_deptos(region,pages,type,scope):
     titles = []
     address = []
     prices = []
+    publication_date = []
+
+    '''
     total_m2 = []
     util_m2 = []
     rooms = []
     toilets = []
     amenities = []
-    publication_date = []
     ambiances = []
     other_features = []
     description = []
@@ -36,26 +38,25 @@ def webscraping_deptos(region,pages,type,scope):
     floors_numbers = []
     apartment_floor_number = []
     apartments_per_floor = []
+    '''
     highlighted_common_expenses = []
     highlighted_characteristics = []
+    number_highlighted_characteristics = []
 
     print("Web Scraping Portal Inmobiliario")
 
     print(f"Buscando {type} para {scope}....")
 
-    # Initialize the driver and load the webpage
-    driver = webdriver.Chrome()
-    
     #Iterar por pagina para encontrar las urls de cada oferta de depto y almacenar los resultados en una lista llamada urls
     for i in range(1,pages*50,50):
         main_url = 'https://www.portalinmobiliario.com/'+scope.lower().replace(" ","-")+'/'+type+'/'+region+'/_Desde_'+ str(i)
         print(main_url)
-        driver.get(main_url)
+        #driver.get(main_url)
         
-        #main_response = requests.get(main_url)
-        sleep(5)
-        #main_soup = BeautifulSoup(main_response.text,'html.parser')
-        main_soup = BeautifulSoup(driver.page_source, 'html.parser')
+        main_response = requests.get(main_url)
+        sleep(0.05)
+        main_soup = BeautifulSoup(main_response.text,'html.parser')
+        #main_soup = BeautifulSoup(driver.page_source, 'html.parser')
         containers = main_soup.find_all('li',{'class':'ui-search-layout__item'})
         #ui-search-result__content ui-search-link
         for container in containers: 
@@ -63,11 +64,15 @@ def webscraping_deptos(region,pages,type,scope):
         
     counter = 0
     
+    # Initialize the driver and load the webpage
+    driver = webdriver.Chrome()
+    sleep(5)
+
     for url in urls:
         print(url)
         #response = requests.get(url,allow_redirects=False)
         driver.get(url)
-        sleep(5)
+        sleep(0.05)
         soup = BeautifulSoup(driver.page_source, 'html.parser')
         
         #soup = BeautifulSoup(response.text,'html.parser')
@@ -98,11 +103,9 @@ def webscraping_deptos(region,pages,type,scope):
         # andes-money-amount__fraction
         # price = soup.find_all('span',class_='price-tag-fraction')
         try:
-            price = soup.find_all('span',class_='andes-money-amount__fraction')
-            if len(price) > 1:
-                prices.append(price[1].text)
-            else:
-                prices.append(price[0].text)
+            price = soup.find('span',class_='andes-money-amount__fraction')
+            print(price.text)
+            prices.append(price.text)
         except (AttributeError,IndexError):
             prices.append(np.nan)
 
@@ -126,13 +129,22 @@ def webscraping_deptos(region,pages,type,scope):
             highlighted_common_expenses.append(np.nan)
 
         try:
-            desc = soup.find_all('span',class_='ui-pdp-color--BLACK ui-pdp-size--SMALL ui-pdp-family--REGULAR ui-pdp-label')
-            for i in range(len(desc)):
-                highlighted_characteristics.append(desc[i].text)
+            characs = soup.find_all('span',class_='ui-pdp-color--BLACK ui-pdp-size--SMALL ui-pdp-family--REGULAR ui-pdp-label')
+            list_characs = ''
+            for i in range(len(characs)):
+                charac_tmp = characs[i].text
+                print(charac_tmp)
+                if i == 0:
+                    list_characs = list_characs + charac_tmp
+                else:
+                    list_characs = list_characs + ' / '+ charac_tmp
+            highlighted_characteristics.append(list_characs)
+            print(len(characs))
+            number_highlighted_characteristics.append(len(characs))
         except (AttributeError,IndexError):
             highlighted_characteristics.append(np.nan)
 
-        
+        '''
         #Guardar informacion de ambientes, comodidades y otras caracteristicas
         try:
             mood_cons = soup.find_all('ul',class_='attribute-list')
@@ -222,7 +234,7 @@ def webscraping_deptos(region,pages,type,scope):
             floors_numbers.append(np.nan)
 
 
-        
+        '''
         #Clausula para mantener cantidad de variables por cada oferta de departamento, en caso de no existir esa variable se llena con nan
         if len(titles) != counter:
             titles.append(np.nan)
@@ -237,8 +249,10 @@ def webscraping_deptos(region,pages,type,scope):
 
         if len(highlighted_characteristics)!= counter:
             highlighted_characteristics.append(np.nan)
+        if len(number_highlighted_characteristics)!= counter:
+            number_highlighted_characteristics.append(np.nan)
             
-
+        '''
         if len(rooms) != counter:
             try:
                 rooms.append(soup.find('dd',{'class':'align-room'}).text)
@@ -283,7 +297,7 @@ def webscraping_deptos(region,pages,type,scope):
             amenities.append(np.nan)
         if len(other_features) != counter:
             other_features.append(np.nan)
-        
+        '''
         print(f"Departamentos en {scope} encontrados: {len(titles)}")
         #clear_output(wait=True)
 
@@ -301,8 +315,10 @@ def webscraping_deptos(region,pages,type,scope):
                     'precio':prices,'url':urls})
     '''
 
-    df = pd.DataFrame({'titulo':titles,'url':urls,'direccion':address,'precio':prices,
-                       'gastos comunes destacados':highlighted_common_expenses,
-                       'caracteristicas destacados':highlighted_characteristics,
-                       'fecha descarga':date.today(),'fecha publicacion':publication_date})
+    df = pd.DataFrame({'direccion':address,'precio':prices, 
+                       'gastos_comunes':highlighted_common_expenses,
+                       'caracteristicas':highlighted_characteristics,
+                       'num_caracteristicas':number_highlighted_characteristics,                       
+                       'fecha_descarga':date.today(),'fecha_publicacion':publication_date,
+                       'titulo':titles,'url':urls})
     return df
