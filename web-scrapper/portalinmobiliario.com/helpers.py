@@ -1,6 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
-from selenium.common.exceptions import WebDriverException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.common.exceptions import TimeoutException
 
 from numpy.core.fromnumeric import amin
 import requests
@@ -80,14 +81,14 @@ def webscraping_deptos(region,pages,type,scope,rango_precio):
 
         max_retries = 10
         retry_delay = 0.05
-
+        timeout = 20
         for _ in range(max_retries):
             try:                
                 driver.get(url)
-                sleep(retry_delay)
+                WebDriverWait(driver, timeout).until(lambda d: d.execute_script('return document.readyState') == 'complete')
                 soup = BeautifulSoup(driver.page_source, 'html.parser')
                 break  # Break out of the loop if the code runs without error
-            except WebDriverException:
+            except TimeoutException:
                 print(f"Error occurred: get failed")
                 retry_delay += 0.1  # Increase the retry delay for the next attempt
                 driver.quit()
