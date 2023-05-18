@@ -2,6 +2,8 @@ from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
 
 from numpy.core.fromnumeric import amin
 import requests
@@ -11,7 +13,12 @@ import re
 import numpy as np 
 import pandas as pd 
 from IPython.display import clear_output
-from time import sleep
+from time import sleep, time
+
+import signal
+
+def timeout_handler(signum, frame):
+    raise TimeoutError("Code execution timed out.")
 
 
 
@@ -82,19 +89,48 @@ def webscraping_deptos(region,pages,type,scope,rango_precio):
         max_retries = 10
         retry_delay = 0.05
         timeout = 20
+        # Set the timeout duration
+        timeout_duration = 30
+
+        # Set the signal handler
+        signal.signal(signal.SIGALRM, timeout_handler)
+
         for _ in range(max_retries):
-            try:                
+            try:          
+                signal.alarm(timeout_duration)   
+                driver.set_page_load_timeout(10)   
                 driver.get(url)
-                WebDriverWait(driver, timeout).until(lambda d: d.execute_script('return document.readyState') == 'complete')
+                sleep(retry_delay)
+                print("get:" + url)
+                WebDriverWait(driver, timeout).until(EC.presence_of_element_located((By.TAG_NAME, 'html')))
                 soup = BeautifulSoup(driver.page_source, 'html.parser')
+                print("soup completed")
                 break  # Break out of the loop if the code runs without error
             except TimeoutException:
-                print(f"Error occurred: get failed")
+                print("Page load timed out.")
                 retry_delay += 0.1  # Increase the retry delay for the next attempt
                 driver.quit()
                 sleep(retry_delay)
                 driver = webdriver.Chrome()
                 sleep(10)
+            except TimeoutError:
+                print("Code execution timed out.")
+                retry_delay += 0.1  # Increase the retry delay for the next attempt
+                driver.quit()
+                sleep(retry_delay)
+                driver = webdriver.Chrome()
+                sleep(10)
+            except Exception:
+                print("An error occurred")
+                retry_delay += 0.1  # Increase the retry delay for the next attempt
+                driver.quit()
+                sleep(retry_delay)
+                driver = webdriver.Chrome()
+                sleep(10)
+            finally:
+                # Cancel the timeout alarm
+                signal.alarm(0)
+                
 
         #soup = BeautifulSoup(response.text,'html.parser')
         counter +=1
