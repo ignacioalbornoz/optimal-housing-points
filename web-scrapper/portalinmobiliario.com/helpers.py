@@ -13,8 +13,8 @@ from time import sleep
 
 
 
-def webscraping_deptos(region,pages,type,scope):  
-
+def webscraping_deptos(region,pages,type,scope,rango_precio):  
+    print(rango_precio)
     urls = []
     titles = []
     address = []
@@ -49,8 +49,10 @@ def webscraping_deptos(region,pages,type,scope):
 
     #Iterar por pagina para encontrar las urls de cada oferta de depto y almacenar los resultados en una lista llamada urls
     for i in range(1,pages*50,50):
-        main_url = 'https://www.portalinmobiliario.com/'+scope.lower().replace(" ","-")+'/'+type+'/'+region+'/_Desde_'+ str(i)
-        print(main_url)
+        #main_url = 'https://www.portalinmobiliario.com/'+scope.lower().replace(" ","-")+'/'+type+'/'+region+'/_Desde_'+ str(i)
+
+        main_url = 'https://www.portalinmobiliario.com/'+scope.lower().replace(" ","-")+'/'+type+'/'+region+'/_Desde_'+ str(i)+rango_precio
+        #print(main_url)
         #driver.get(main_url)
         
         main_response = requests.get(main_url)
@@ -66,15 +68,29 @@ def webscraping_deptos(region,pages,type,scope):
     
     # Initialize the driver and load the webpage
     driver = webdriver.Chrome()
-    sleep(5)
+    sleep(10)
 
     for url in urls:
-        print(url)
+        #print(url)
         #response = requests.get(url,allow_redirects=False)
-        driver.get(url)
-        sleep(0.05)
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-        
+        #driver.get(url)
+        #sleep(0.2)
+        #soup = BeautifulSoup(driver.page_source, 'html.parser')
+
+        max_retries = 10
+        retry_delay = 0.05
+
+        for _ in range(max_retries):
+            try:
+                driver.get(url)
+                sleep(retry_delay)
+                soup = BeautifulSoup(driver.page_source, 'html.parser')
+                break  # Break out of the loop if the code runs without error
+            except Exception as e:
+                print(f"Error occurred: get failed")
+                retry_delay += 0.1  # Increase the retry delay for the next attempt
+                sleep(retry_delay)
+
         #soup = BeautifulSoup(response.text,'html.parser')
         counter +=1
         
@@ -93,7 +109,7 @@ def webscraping_deptos(region,pages,type,scope):
             #father_address_tmp = soup.find('div',class_='ui-pdp-media ui-vip-location__subtitle ui-pdp-color--BLACK')
             #print(father_address_tmp)
             address_tmp = soup.find_all('p',class_='ui-pdp-color--BLACK ui-pdp-size--SMALL ui-pdp-family--REGULAR ui-pdp-media__title')
-            print(address_tmp[-1].text)
+            #print(address_tmp[-1].text)
             address.append(address_tmp[-1].text)
         except (AttributeError,IndexError):
             address.append(np.nan)
@@ -104,7 +120,7 @@ def webscraping_deptos(region,pages,type,scope):
         # price = soup.find_all('span',class_='price-tag-fraction')
         try:
             price = soup.find('span',class_='andes-money-amount__fraction')
-            print(price.text)
+            #print(price.text)
             prices.append(price.text)
         except (AttributeError,IndexError):
             prices.append(np.nan)
@@ -133,13 +149,13 @@ def webscraping_deptos(region,pages,type,scope):
             list_characs = ''
             for i in range(len(characs)):
                 charac_tmp = characs[i].text
-                print(charac_tmp)
+                #print(charac_tmp)
                 if i == 0:
                     list_characs = list_characs + charac_tmp
                 else:
                     list_characs = list_characs + ' / '+ charac_tmp
             highlighted_characteristics.append(list_characs)
-            print(len(characs))
+            #print(len(characs))
             number_highlighted_characteristics.append(len(characs))
         except (AttributeError,IndexError):
             highlighted_characteristics.append(np.nan)
@@ -299,7 +315,7 @@ def webscraping_deptos(region,pages,type,scope):
             other_features.append(np.nan)
         '''
         print(f"Departamentos en {scope} encontrados: {len(titles)}")
-        #clear_output(wait=True)
+        clear_output(wait=True)
 
     print(f"Total informacion extraida de departamentos en {scope}: {len(titles)}")
     print('Web Scraping Completado!\n')
