@@ -4,6 +4,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import WebDriverException
 
 from numpy.core.fromnumeric import amin
 import requests
@@ -19,8 +20,6 @@ import signal
 
 def timeout_handler(signum, frame):
     raise TimeoutError("Code execution timed out.")
-
-
 
 def webscraping_deptos(region,pages,type,scope,rango_precio):  
     print(rango_precio)
@@ -96,7 +95,7 @@ def webscraping_deptos(region,pages,type,scope,rango_precio):
         signal.signal(signal.SIGALRM, timeout_handler)
 
         for _ in range(max_retries):
-            try:          
+            try:         
                 signal.alarm(timeout_duration)   
                 driver.set_page_load_timeout(10)   
                 driver.get(url)
@@ -112,21 +111,25 @@ def webscraping_deptos(region,pages,type,scope,rango_precio):
                 driver.quit()
                 sleep(retry_delay)
                 driver = webdriver.Chrome()
-                sleep(10)
             except TimeoutError:
                 print("Code execution timed out.")
                 retry_delay += 0.1  # Increase the retry delay for the next attempt
                 driver.quit()
+                print("Driver quit.")
                 sleep(retry_delay)
                 driver = webdriver.Chrome()
                 sleep(10)
-            except Exception:
-                print("An error occurred")
-                retry_delay += 0.1  # Increase the retry delay for the next attempt
-                driver.quit()
-                sleep(retry_delay)
-                driver = webdriver.Chrome()
-                sleep(10)
+            except Exception as e:
+                print("An error occurred:", e)
+                retry_delay += 0.1
+                driver = None
+                while driver is None:
+                    try:
+                        driver = webdriver.Chrome()
+                    except Exception as chrome_error:
+                        print("Failed to create new Chrome driver:", chrome_error)
+                        sleep(retry_delay)
+
             finally:
                 # Cancel the timeout alarm
                 signal.alarm(0)
