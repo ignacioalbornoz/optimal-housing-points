@@ -10,6 +10,7 @@ from numpy.core.fromnumeric import amin
 import requests
 from bs4 import BeautifulSoup
 from datetime import date
+from datetime import datetime
 import re 
 import numpy as np 
 import pandas as pd 
@@ -421,14 +422,20 @@ def look_results_number(region,type,scope,rango_precio):
 
 
 
-def webscraping_deptos_all(region,type,scope):  
+def webscraping_deptos_all(region,type,scope, rango_precio='_PriceRange_0CLP-0CLP'):  
     dfs = []
-    current_rango_precio = '_PriceRange_0CLP-0CLP'
+    current_rango_precio = rango_precio
     prices_used_list=[]
 
-    # Create an empty list to store data frames
-    number1 = 0
-    number2 = 0
+    pattern = r"(\d+)CLP-(\d+)CLP"
+
+    # Find all matches of the pattern in the text string
+    matches = re.findall(pattern, current_rango_precio)
+
+    # Extract the second-to-last match and convert it to integers
+    number1 = int(matches[0][0])
+    number2 = int(matches[0][1])
+
     while True:
         clean_number  = look_results_number(region,type,scope,current_rango_precio)
         if int(clean_number) ==0:
@@ -461,14 +468,25 @@ def webscraping_deptos_all(region,type,scope):
             # Write each list element to a new line in the file
             for item in prices_used_list:
                 file.write(str(item) + "\n")
-        df = webscraping_deptos(region, 1, type, scope, current_rango_precio)
+        df = webscraping_deptos(region, 40, type, scope, current_rango_precio)
         # Append the data frame to the list
+
+        now = datetime.now()
+        formatted_time = now.strftime("%Y-%m-%d %H-%M-%S")
+
+        df.to_csv('./data/'+'all-data-raw-from-'+region+'_'+formatted_time+'_'+current_rango_precio+'_'+'.csv',index=False)
         dfs.append(df)
+        if int(number2) == 0:
+            break
         number1 = number2+1
         number2 = 0
         current_rango_precio = '_PriceRange_'+str(number1)+'CLP-'+str(number2)+'CLP'
 
     # Concatenate vertically
     concatenated_df = pd.concat(dfs, axis=0)
+    now = datetime.now()
+    formatted_time = now.strftime("%Y-%m-%d %H-%M-%S")
+
+    concatenated_df.to_csv('./data/'+'all-data-raw-from-'+region+'_'+formatted_time+'_concatenated_'+'.csv',index=False)
     
     return concatenated_df
