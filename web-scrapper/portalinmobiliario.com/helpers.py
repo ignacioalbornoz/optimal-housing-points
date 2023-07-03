@@ -10,11 +10,14 @@ from numpy.core.fromnumeric import amin
 import requests
 from bs4 import BeautifulSoup
 from datetime import date
+from datetime import datetime
 import re 
 import numpy as np 
 import pandas as pd 
 from IPython.display import clear_output
 from time import sleep, time
+
+import sys
 
 import signal
 
@@ -55,6 +58,7 @@ def webscraping_deptos(region,pages,type,scope,rango_precio):
 
     print(f"Buscando {type} para {scope}....")
 
+
     #Iterar por pagina para encontrar las urls de cada oferta de depto y almacenar los resultados en una lista llamada urls
     for i in range(1,pages*50,50):
         #main_url = 'https://www.portalinmobiliario.com/'+scope.lower().replace(" ","-")+'/'+type+'/'+region+'/_Desde_'+ str(i)
@@ -71,6 +75,9 @@ def webscraping_deptos(region,pages,type,scope,rango_precio):
         #ui-search-result__content ui-search-link
         for container in containers: 
             urls.append(container.find('a',class_='ui-search-result__content-wrapper ui-search-link')['href'])
+
+
+
         
     counter = 0
     
@@ -364,7 +371,7 @@ def webscraping_deptos(region,pages,type,scope,rango_precio):
     print(f"Total informacion extraida de departamentos en {scope}: {len(titles)}")
     print('Web Scraping Completado!\n')
 
-
+    driver.quit()
     '''
     df = pd.DataFrame({'fecha descarga':date.today(),'fecha publicacion':publication_date,'titulo':titles,'direccion':address,
                     'gastos comunes destacados':highlighted_common_expenses,'caracteristicas destacados':highlighted_characteristics,
@@ -382,3 +389,104 @@ def webscraping_deptos(region,pages,type,scope,rango_precio):
                        'fecha_descarga':date.today(),'fecha_publicacion':publication_date,
                        'titulo':titles,'url':urls})
     return df
+
+
+
+
+
+
+def look_results_number(region,type,scope,rango_precio):
+
+    init_url = 'https://www.portalinmobiliario.com/'+scope.lower().replace(" ","-")+'/'+type+'/'+region+'/_Desde_'+ str(1)+rango_precio
+    print(init_url)
+    init_response = requests.get(init_url)
+    sleep(0.05)
+    init_soup = BeautifulSoup(init_response.text,'html.parser')
+    try:
+        test_var = (init_soup.find('span',class_='ui-search-search-result__quantity-results shops-custom-secondary-font').text)
+        pattern = r"\d{1,3}(?:\.\d{3})*"
+
+        # Find all matches of the pattern in the text string
+        matches = re.findall(pattern, test_var)
+
+        # Extract the first match and remove the thousands separators
+        clean_number = matches[0].replace(".", "")
+
+    except (AttributeError,IndexError) as e:
+        print(e)
+        sys.exit(1)
+
+    return clean_number
+
+
+
+
+
+def webscraping_deptos_all(region,type,scope, rango_precio='_PriceRange_0CLP-0CLP'):  
+    dfs = []
+    current_rango_precio = rango_precio
+    prices_used_list=[]
+
+    pattern = r"(\d+)CLP-(\d+)CLP"
+
+    # Find all matches of the pattern in the text string
+    matches = re.findall(pattern, current_rango_precio)
+
+    # Extract the second-to-last match and convert it to integers
+    number1 = int(matches[0][0])
+    number2 = int(matches[0][1])
+
+    while True:
+        clean_number  = look_results_number(region,type,scope,current_rango_precio)
+        if int(clean_number) ==0:
+            break
+        if int(clean_number)> 2000 and number2==0:
+            number2 = number1+500000
+            current_rango_precio = '_PriceRange_'+str(number1)+'CLP-'+str(number2)+'CLP'
+        while int(clean_number)> 2000:
+            # Define a regular expression pattern to match the number segment
+            pattern = r"(\d+)CLP-(\d+)CLP"
+
+            # Find all matches of the pattern in the text string
+            matches = re.findall(pattern, current_rango_precio)
+
+            # Extract the second-to-last match and convert it to integers
+            number1 = int(matches[0][0])
+            number2 = int(matches[0][1])
+
+            # Modify the first number as desired
+            number2 = number2 - int((number2-number1)/4)  
+
+            # Construct the new text with the modified number
+            current_rango_precio = re.sub(pattern, str(number1) + "CLP-" + str(number2) + "CLP", current_rango_precio, count=1)
+            clean_number  = look_results_number(region,type,scope,current_rango_precio)
+
+        #print(current_rango_precio)
+        prices_used_list.append(current_rango_precio)
+        # Open a file in write mode
+        with open("prices_used_list.txt", "w") as file:
+            # Write each list element to a new line in the file
+            for item in prices_used_list:
+                file.write(str(item) + "\n")
+        df = webscraping_deptos(region, 40, type, scope, current_rango_precio)
+        # Append the data frame to the list
+
+        now = datetime.now()
+        formatted_time = now.strftime("%Y-%m-%d %H-%M-%S")
+
+        df.to_csv('./data/'+'all-data-raw-from-'+region+'_'+formatted_time+'_'+current_rango_precio+'_'+'.csv',index=False)
+        dfs.append(df)
+        if int(number2) == 0:
+            break
+        number1 = number2+1
+        number2 = 0
+        current_rango_precio = '_PriceRange_'+str(number1)+'CLP-'+str(number2)+'CLP'
+
+    # Concatenate vertically
+    concatenated_df = pd.concat(dfs, axis=0)
+    now = datetime.now()
+    formatted_time = now.strftime("%Y-%m-%d %H-%M-%S")
+
+    concatenated_df.to_csv('./data/'+'all-data-raw-from-'+region+'_'+formatted_time+'_concatenated_'+'.csv',index=False)
+    
+    return concatenated_df
